@@ -8,7 +8,8 @@
     "dev:full": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
-    "db:setup": "node scripts/db-setup.js"
+    "db:setup": "node scripts/db-setup.js",
+    "db:migrar-da-escala": "node scripts/migrar-da-escala.js"
   },
   "dependencies": {
     "@tiptap/extension-text-style": "^3.32.0",

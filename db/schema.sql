@@ -1,5 +1,5 @@
--- Esquema próprio do app de validação, dentro do banco da Nova Escala (Neon).
--- Não altera nenhuma tabela da Nova Escala; só lê public.colaboradores no login.
+-- Banco próprio do app de validação (VALIDACAO_DATABASE_URL).
+-- O banco da Nova Escala (DATABASE_URL) é usado só para conferir o login.
 create schema if not exists validacao;
 
 create table if not exists validacao.jornadas (

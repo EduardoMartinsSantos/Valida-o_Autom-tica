@@ -1,4 +1,4 @@
-import { query } from '../server/db.js'
+import { query, queryEscala } from '../server/db.js'
 import { HttpError, route } from '../server/http.js'
 import { senhaConfere } from '../server/senha.js'
 import { setSession } from '../server/session.js'
@@ -37,7 +37,7 @@ export default route({
     }
 
     // Usuários e senhas vêm da Nova Escala (somente leitura).
-    const { rows } = await query(
+    const { rows } = await queryEscala(
       `select id, nome, email, ativo, senha_hash from public.colaboradores
        where lower(email) = $1 and email <> ''`,
       [email],
