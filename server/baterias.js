@@ -12,7 +12,9 @@ function traduzErro(err) {
 export async function listarBaterias() {
   const { rows } = await query(`
     select b.id, b.gml, b.criado_por, b.criado_em, b.link_pasta, b.finalizada_em,
-      (select count(*)::int from validacao.jornadas) as total,
+      -- Bateria concluída fica congelada: total = validações registradas, não as jornadas atuais.
+      (case when b.link_pasta is not null then count(e.id)
+            else (select count(*) from validacao.jornadas) end)::int as total,
       (count(e.id) filter (where e.status = 'em_validacao'))::int as em_validacao,
       (count(e.id) filter (where e.status = 'concluida'))::int as concluidas
     from validacao.baterias b
@@ -36,8 +38,10 @@ export async function obterBateria(id) {
   try {
     const { rows } = await query(
       `select id, gml, criado_por, criado_em, link_pasta, finalizada_em, finalizada_por,
-              (select count(*)::int from validacao.jornadas) as total
-       from validacao.baterias where id = $1`,
+              (case when link_pasta is not null
+                    then (select count(*) from validacao.execucoes e where e.bateria_id = b.id)
+                    else (select count(*) from validacao.jornadas) end)::int as total
+       from validacao.baterias b where id = $1`,
       [id],
     )
     if (!rows[0]) throw new HttpError(404, 'Bateria não encontrada.')

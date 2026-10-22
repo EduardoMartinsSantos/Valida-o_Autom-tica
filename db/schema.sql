@@ -39,7 +39,7 @@ alter table validacao.baterias add column if not exists finalizada_por text;
 create table if not exists validacao.execucoes (
   id uuid primary key default gen_random_uuid(),
   bateria_id uuid not null references validacao.baterias(id) on delete cascade,
-  jornada_id uuid not null references validacao.jornadas(id) on delete restrict,
+  jornada_id uuid references validacao.jornadas(id) on delete set null,
   jornada_nome text not null,
   status text not null check (status in ('em_validacao', 'concluida')),
   responsavel_email text not null,
@@ -50,6 +50,13 @@ create table if not exists validacao.execucoes (
   pdf bytea,
   unique (bateria_id, jornada_id)
 );
+
+-- Excluir uma jornada não apaga o histórico: a validação guarda jornada_nome e fica sem jornada_id.
+-- (Bancos criados antes tinham "not null" + "on delete restrict"; estas linhas atualizam.)
+alter table validacao.execucoes alter column jornada_id drop not null;
+alter table validacao.execucoes drop constraint if exists execucoes_jornada_id_fkey;
+alter table validacao.execucoes add constraint execucoes_jornada_id_fkey
+  foreign key (jornada_id) references validacao.jornadas(id) on delete set null;
 
 -- Prints da validação. Ficam até o link da pasta ser salvo na bateria
 -- (ou somem ao liberar a validação, por cascade).
