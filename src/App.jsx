@@ -21,7 +21,6 @@ export default function App() {
   // undefined = verificando sessão; null = deslogado.
   const [user, setUser] = useState(undefined)
   const [route, setRoute] = useState({ page: 'inicio', params: {} })
-  const Page = PAGES[route.page]
   const navigate = (page, params = {}) => setRoute({ page, params })
 
   useEffect(() => {
@@ -40,9 +39,13 @@ export default function App() {
   if (user === undefined) return null
   if (user === null) return <Login onLogin={setUser} />
 
+  // Configurações é só para admin (o servidor também bloqueia as alterações).
+  const page = route.page === 'configuracoes' && !user.admin ? 'inicio' : route.page
+  const Page = PAGES[page]
+
   return (
     <div className="app-shell">
-      <Sidebar active={MENU_ITEM[route.page] ?? route.page} onNavigate={navigate}
+      <Sidebar active={MENU_ITEM[page] ?? page} onNavigate={navigate}
         user={user} onLogout={handleLogout} />
       <main className="layout">
         <Page key={JSON.stringify(route)} {...route.params} user={user} onNavigate={navigate} />

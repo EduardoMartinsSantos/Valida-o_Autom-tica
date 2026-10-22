@@ -38,7 +38,7 @@ export default route({
 
     // Usuários e senhas vêm da Nova Escala (somente leitura).
     const { rows } = await queryEscala(
-      `select id, nome, email, ativo, senha_hash from public.colaboradores
+      `select id, nome, email, ativo, admin, senha_hash from public.colaboradores
        where lower(email) = $1 and email <> ''`,
       [email],
     )
@@ -50,7 +50,7 @@ export default route({
     }
 
     await query('delete from validacao.login_falhas where email = $1', [email])
-    const user = { id: colaborador.id, name: colaborador.nome, email: colaborador.email }
+    const user = { id: colaborador.id, name: colaborador.nome, email: colaborador.email, admin: Boolean(colaborador.admin) }
     setSession(res, user)
     res.json({ user })
   },

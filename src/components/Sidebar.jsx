@@ -19,7 +19,7 @@ function HomeIcon() {
 
 const ITEMS = [
   { id: 'inicio', label: 'Início', Icon: HomeIcon },
-  { id: 'configuracoes', label: 'Configurações', Icon: GearIcon },
+  { id: 'configuracoes', label: 'Configurações', Icon: GearIcon, adminOnly: true },
 ]
 
 function LogoutIcon() {
@@ -35,7 +35,7 @@ export default function Sidebar({ active, onNavigate, user, onLogout }) {
   return (
     <nav className="sidebar" aria-label="Menu principal">
       <div className="sidebar-brand">MOps</div>
-      {ITEMS.map(({ id, label, Icon }) => (
+      {ITEMS.filter((item) => !item.adminOnly || user.admin).map(({ id, label, Icon }) => (
         <button
           key={id}
           type="button"

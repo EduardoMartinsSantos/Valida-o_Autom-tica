@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { queryEscala } from './db.js'
 import { HttpError } from './http.js'
 
 const COOKIE = 'validacao_session'
@@ -22,6 +23,7 @@ export function setSession(res, user) {
     id: user.id,
     name: user.name,
     email: user.email,
+    admin: user.admin === true,
     exp: Date.now() + MAX_AGE_S * 1000,
   })).toString('base64url')
   res.setHeader('Set-Cookie', cookie(`${payload}.${sign(payload)}`, MAX_AGE_S))
@@ -56,5 +58,17 @@ export function getSession(req) {
 export function requireUser(req) {
   const user = getSession(req)
   if (!user) throw new HttpError(401, 'Sessão expirada. Entre novamente.')
+  return user
+}
+
+// Admin vem da Nova Escala (colaboradores.admin). Conferido no banco a cada alteração,
+// para que perder o admin valha na hora, sem esperar a sessão expirar.
+export async function requireAdmin(req) {
+  const user = requireUser(req)
+  const { rows } = await queryEscala(
+    'select admin from public.colaboradores where id = $1 and ativo <> 0',
+    [user.id],
+  )
+  if (!rows[0]?.admin) throw new HttpError(403, 'Apenas administradores podem alterar jornadas.')
   return user
 }

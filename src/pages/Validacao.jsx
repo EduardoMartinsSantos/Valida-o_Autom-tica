@@ -265,9 +265,11 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
             ) : (
               <p className="muted">
                 Sem descrição cadastrada.{' '}
-                <button type="button" className="link-btn" onClick={() => onNavigate('configuracoes')}>
-                  Cadastrar em Configurações
-                </button>
+                {user.admin && (
+                  <button type="button" className="link-btn" onClick={() => onNavigate('configuracoes')}>
+                    Cadastrar em Configurações
+                  </button>
+                )}
               </p>
             )}
           </section>

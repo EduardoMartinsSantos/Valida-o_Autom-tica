@@ -172,7 +172,7 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
         </div>
 
         {linhas.length === 0 ? (
-          <p className="muted">Nenhuma jornada cadastrada. Cadastre em Configurações.</p>
+          <p className="muted">Nenhuma jornada cadastrada.{user.admin && ' Cadastre em Configurações.'}</p>
         ) : (
           <ul className="execucao-list">
             {linhas.map(({ jornada, execucao }) => {
