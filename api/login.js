@@ -1,6 +1,6 @@
-import bcrypt from 'bcryptjs'
 import { query } from '../server/db.js'
 import { HttpError, route } from '../server/http.js'
+import { senhaConfere } from '../server/senha.js'
 import { setSession } from '../server/session.js'
 
 const MAX_FALHAS = 5
@@ -36,17 +36,22 @@ export default route({
       throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos e tente de novo.')
     }
 
-    // Usuários e senhas vêm do Mops-Escala (somente leitura).
-    const { rows } = await query('select id, name, email, password from public.users where email = $1', [email])
-    const user = rows[0]
-    const valido = Boolean(user?.password) && (await bcrypt.compare(password, user.password))
-    if (!valido) {
+    // Usuários e senhas vêm da Nova Escala (somente leitura).
+    const { rows } = await query(
+      `select id, nome, email, ativo, senha_hash from public.colaboradores
+       where lower(email) = $1 and email <> ''`,
+      [email],
+    )
+    const colaborador = rows[0]
+    // Mesma mensagem para e-mail inexistente, inativo ou senha errada.
+    if (!colaborador?.ativo || !senhaConfere(password, colaborador.senha_hash)) {
       await registrarFalha(email)
       throw new HttpError(401, 'E-mail ou senha inválidos.')
     }
 
     await query('delete from validacao.login_falhas where email = $1', [email])
+    const user = { id: colaborador.id, name: colaborador.nome, email: colaborador.email }
     setSession(res, user)
-    res.json({ user: { id: user.id, name: user.name, email: user.email } })
+    res.json({ user })
   },
 })

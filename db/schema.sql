@@ -1,5 +1,5 @@
--- Esquema próprio do app de validação, dentro do banco do Mops-Escala.
--- Não altera nenhuma tabela do Mops-Escala; só lê public.users no login.
+-- Esquema próprio do app de validação, dentro do banco da Nova Escala (Neon).
+-- Não altera nenhuma tabela da Nova Escala; só lê public.colaboradores no login.
 create schema if not exists validacao;
 
 create table if not exists validacao.jornadas (

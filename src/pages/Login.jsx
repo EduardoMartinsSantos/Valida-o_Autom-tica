@@ -24,7 +24,7 @@ export default function Login({ onLogin }) {
     <main className="login-page">
       <form className="card login-card" onSubmit={handleSubmit}>
         <h1>Validação Automática</h1>
-        <p className="muted">Entre com seu e-mail e senha do Mops-Escala.</p>
+        <p className="muted">Entre com o mesmo e-mail e senha da Nova Escala.</p>
         <div className="field">
           <label htmlFor="login-email">E-mail</label>
           <input id="login-email" type="email" autoComplete="username" required autoFocus
