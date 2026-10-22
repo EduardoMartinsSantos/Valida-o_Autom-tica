@@ -1,0 +1,50 @@
+import { useEffect, useState } from 'react'
+import { api, SESSAO_EXPIRADA } from './api.js'
+import Sidebar from './components/Sidebar.jsx'
+import Configuracoes from './pages/Configuracoes.jsx'
+import Inicio from './pages/Inicio.jsx'
+import Login from './pages/Login.jsx'
+import Validacao from './pages/Validacao.jsx'
+
+const PAGES = {
+  inicio: Inicio,
+  configuracoes: Configuracoes,
+  validacao: Validacao,
+}
+
+// Páginas sem item próprio no menu destacam o item de origem.
+const MENU_ITEM = { validacao: 'inicio' }
+
+export default function App() {
+  // undefined = verificando sessão; null = deslogado.
+  const [user, setUser] = useState(undefined)
+  const [route, setRoute] = useState({ page: 'inicio', params: {} })
+  const Page = PAGES[route.page]
+  const navigate = (page, params = {}) => setRoute({ page, params })
+
+  useEffect(() => {
+    api('me').then((d) => setUser(d.user ?? null)).catch(() => setUser(null))
+    const expirou = () => setUser(null)
+    window.addEventListener(SESSAO_EXPIRADA, expirou)
+    return () => window.removeEventListener(SESSAO_EXPIRADA, expirou)
+  }, [])
+
+  async function handleLogout() {
+    await api('logout', { method: 'POST' }).catch(() => {})
+    setUser(null)
+    navigate('inicio')
+  }
+
+  if (user === undefined) return null
+  if (user === null) return <Login onLogin={setUser} />
+
+  return (
+    <div className="app-shell">
+      <Sidebar active={MENU_ITEM[route.page] ?? route.page} onNavigate={navigate}
+        user={user} onLogout={handleLogout} />
+      <main className="layout">
+        <Page key={JSON.stringify(route)} {...route.params} user={user} onNavigate={navigate} />
+      </main>
+    </div>
+  )
+}
