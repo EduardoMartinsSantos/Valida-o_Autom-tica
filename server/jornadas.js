@@ -71,8 +71,20 @@ export async function atualizar(id, jornada, user) {
 
 export async function excluir(id) {
   try {
-    const { rowCount } = await query('delete from validacao.jornadas where id = $1', [id])
-    if (!rowCount) throw new HttpError(404, 'Jornada não encontrada.')
+    // Bloqueia só se a jornada estiver em bateria ainda aberta (sem link da pasta);
+    // baterias concluídas mantêm o registro com o nome da jornada.
+    const { rowCount } = await query(
+      `delete from validacao.jornadas j
+       where j.id = $1 and not exists (
+         select 1 from validacao.execucoes e join validacao.baterias b on b.id = e.bateria_id
+         where e.jornada_id = j.id and b.link_pasta is null)`,
+      [id],
+    )
+    if (!rowCount) {
+      const { rows } = await query('select 1 from validacao.jornadas where id = $1', [id])
+      if (!rows[0]) throw new HttpError(404, 'Jornada não encontrada.')
+      throw new HttpError(409, 'Esta jornada está em uma bateria em andamento e não pode ser excluída agora.')
+    }
   } catch (err) {
     throw traduzErro(err)
   }

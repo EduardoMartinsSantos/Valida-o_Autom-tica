@@ -35,10 +35,19 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
     )
   }
 
-  const linhas = jornadas.map((jornada) => ({
-    jornada,
-    execucao: bateria.execucoes.find((e) => e.jornada_id === jornada.id) ?? null,
-  }))
+  // Bateria concluída (link salvo) fica congelada: mostra só as validações registradas,
+  // com o nome da jornada da época, sem refletir jornadas criadas/editadas/excluídas depois.
+  const linhas = bateria.link_pasta
+    ? [...bateria.execucoes]
+      .sort((a, b) => a.jornada_nome.localeCompare(b.jornada_nome))
+      .map((execucao) => ({
+        jornada: { id: execucao.jornada_id ?? execucao.id, nome: execucao.jornada_nome, passos: [] },
+        execucao,
+      }))
+    : jornadas.map((jornada) => ({
+      jornada,
+      execucao: bateria.execucoes.find((e) => e.jornada_id === jornada.id) ?? null,
+    }))
   const concluidas = linhas.filter((l) => l.execucao?.status === 'concluida').length
   const percentual = linhas.length ? Math.round((concluidas / linhas.length) * 100) : 0
   const stBateria = statusBateria({ link_pasta: bateria.link_pasta, total: linhas.length, concluidas })
