@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/db-setup.js --se-configurado && vite build",
     "preview": "vite preview",
     "db:setup": "node scripts/db-setup.js",
     "db:migrar-da-escala": "node scripts/migrar-da-escala.js"
