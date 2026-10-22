@@ -1,13 +1,16 @@
 // Chrome/Edge: janela "Salvar como" que lembra a última pasta (ex.: pasta do SharePoint
 // sincronizada pelo OneDrive). Outros navegadores: download comum.
 // Precisa ser chamado direto no clique, antes de qualquer espera longa.
-export async function escolherDestino(nomeSugerido) {
+const PDF = { description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }
+export const ZIP = { description: 'Pasta compactada (.zip)', accept: { 'application/zip': ['.zip'] } }
+
+export async function escolherDestino(nomeSugerido, tipo = PDF) {
   if (!('showSaveFilePicker' in window)) return { download: nomeSugerido }
   try {
     return await window.showSaveFilePicker({
       id: 'validacoes-pdf',
       suggestedName: nomeSugerido,
-      types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+      types: [tipo],
     })
   } catch (err) {
     if (err.name === 'AbortError') return null

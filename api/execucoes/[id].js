@@ -1,6 +1,6 @@
 import { route } from '../../server/http.js'
 import { requireUser } from '../../server/session.js'
-import { finalizarExecucao, liberarExecucao, obterPdf } from '../../server/baterias.js'
+import { finalizarExecucao, liberarExecucao, obterPdf, reabrirExecucao } from '../../server/baterias.js'
 
 export default route({
   // Download do PDF da validação concluída.
@@ -15,6 +15,11 @@ export default route({
     const user = requireUser(req)
     await finalizarExecucao(req.query.id, req.body, user)
     res.json({ ok: true })
+  },
+  // Reabre uma validação concluída.
+  async PATCH(req, res) {
+    const user = requireUser(req)
+    res.json({ execucao: await reabrirExecucao(req.query.id, user) })
   },
   async DELETE(req, res) {
     const user = requireUser(req)

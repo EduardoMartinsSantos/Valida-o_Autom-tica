@@ -14,8 +14,8 @@ export function nomeArquivoPdf(jornadaNome, gml, data) {
   return `Validacao - GML ${gml} - ${jornadaNome} - ${carimbo}.pdf`.replace(/[\\/:*?"<>|]/g, '-')
 }
 
-// Converte qualquer imagem para JPEG (reduzida até MAX_IMG_PX): o jsPDF aceita e o PDF fica bem menor.
-async function paraJpeg(blob) {
+// Desenha a imagem num canvas branco, reduzida até MAX_IMG_PX de largura.
+async function desenhar(blob) {
   const bitmap = await createImageBitmap(blob)
   const escala = Math.min(1, MAX_IMG_PX / bitmap.width)
   const canvas = document.createElement('canvas')
@@ -26,6 +26,20 @@ async function paraJpeg(blob) {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
+  return canvas
+}
+
+// Print comprimido (JPEG) para salvar no servidor; o mesmo tamanho usado no PDF.
+export async function comprimirImagem(blob) {
+  const canvas = await desenhar(blob)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao comprimir a imagem.'))), 'image/jpeg', 0.8)
+  })
+}
+
+// JPEG: o jsPDF aceita e o PDF fica bem menor que com PNG.
+async function paraJpeg(blob) {
+  const canvas = await desenhar(blob)
   return { data: canvas.toDataURL('image/jpeg', 0.8), width: canvas.width, height: canvas.height }
 }
 

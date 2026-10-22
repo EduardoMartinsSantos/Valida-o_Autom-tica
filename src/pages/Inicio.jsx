@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, useCarregar } from '../api.js'
+import { statusBateria } from '../baterias.js'
 
 const dataHora = (valor) => new Date(valor).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
@@ -79,11 +80,15 @@ export default function Inicio({ onNavigate }) {
         <ul className="jornada-grid">
           {baterias.map((b) => {
             const percentual = b.total ? Math.round((b.concluidas / b.total) * 100) : 0
+            const st = statusBateria(b)
             return (
               <li key={b.id}>
                 <button type="button" className="jornada-card"
                   onClick={() => onNavigate('bateria', { bateriaId: b.id })}>
-                  <span className="jornada-card-title">GML {b.gml}</span>
+                  <span className="titulo-status">
+                    <span className="jornada-card-title">GML {b.gml}</span>
+                    <span className={`status-badge ${st.className}`}>{st.label}</span>
+                  </span>
                   <span className="muted">{dataHora(b.criado_em)} · {b.criado_por}</span>
                   <span className="jornada-card-resumo">
                     {b.concluidas} de {b.total} concluídas

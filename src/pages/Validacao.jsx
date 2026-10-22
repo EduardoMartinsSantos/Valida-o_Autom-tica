@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, useCarregar } from '../api.js'
+import { api, apiBlob, useCarregar } from '../api.js'
 import { useJornadas } from '../jornadas.js'
-import { gerarPdfValidacao } from '../pdf.js'
+import { comprimirImagem, gerarPdfValidacao } from '../pdf.js'
 import RichTextEditor from '../components/RichTextEditor.jsx'
 
 const MAX_PRINT_BYTES = 10 * 1024 * 1024
@@ -31,11 +31,12 @@ function LampadaIcon() {
   )
 }
 
-function PrintField({ numero, print, onFile, onRemove }) {
+function PrintField({ numero, print, enviando, onFile, onRemove }) {
   const inputRef = useRef(null)
   const [dragging, setDragging] = useState(false)
 
   function handlePaste(e) {
+    if (enviando) return
     const file = imageFrom(e.clipboardData)
     if (!file) return
     e.preventDefault()
@@ -45,9 +46,12 @@ function PrintField({ numero, print, onFile, onRemove }) {
   function handleDrop(e) {
     e.preventDefault()
     setDragging(false)
+    if (enviando) return
     const file = imageFrom(e.dataTransfer)
     if (file) onFile(file)
   }
+
+  if (enviando) return <p className="print-enviando" role="status">Salvando print...</p>
 
   if (print) {
     return (
@@ -99,12 +103,32 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
   const [status, setStatus] = useState('')
   const [saving, setSaving] = useState(false)
   const [hintsAbertos, setHintsAbertos] = useState({})
+  const [carregandoPrints, setCarregandoPrints] = useState(true)
+  const [enviando, setEnviando] = useState({}) // passoId -> true enquanto salva/remove
 
   const printsRef = useRef(prints)
   printsRef.current = prints
   useEffect(() => () => Object.values(printsRef.current).forEach((p) => URL.revokeObjectURL(p.url)), [])
 
-  if (loading || carregandoBateria) return <p className="muted">Carregando jornada...</p>
+  // Recupera os prints já salvos desta validação (rascunho no servidor).
+  useEffect(() => {
+    let ativo = true
+    const base = `prints?execucaoId=${encodeURIComponent(execucaoId)}`
+    api(base)
+      .then(({ passos }) => Promise.all(passos.map(async (passoId) => {
+        const blob = await apiBlob(`${base}&passoId=${encodeURIComponent(passoId)}`)
+        return [passoId, { blob, url: URL.createObjectURL(blob) }]
+      })))
+      .then((lista) => {
+        if (ativo) setPrints(Object.fromEntries(lista))
+        else lista.forEach(([, p]) => URL.revokeObjectURL(p.url))
+      })
+      .catch((err) => ativo && setStatus(`Não foi possível carregar os prints salvos: ${err.message}`))
+      .finally(() => ativo && setCarregandoPrints(false))
+    return () => { ativo = false }
+  }, [execucaoId])
+
+  if (loading || carregandoBateria || carregandoPrints) return <p className="muted">Carregando validação...</p>
 
   const voltar = () => onNavigate('bateria', { bateriaId })
 
@@ -124,7 +148,10 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
   const percentual = total ? Math.round((concluidos / total) * 100) : 0
   const completo = total > 0 && concluidos === total
 
-  function setPrint(passoId, file) {
+  const marcarEnvio = (passoId, ativo) => setEnviando((atual) => ({ ...atual, [passoId]: ativo }))
+
+  // Comprime, salva no servidor e só então mostra: o print sobrevive a sair e voltar.
+  async function setPrint(passoId, file) {
     if (!file.type.startsWith('image/')) {
       setStatus('O arquivo precisa ser uma imagem.')
       return
@@ -134,27 +161,63 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
       return
     }
     setStatus('')
-    setPrints((current) => {
-      if (current[passoId]) URL.revokeObjectURL(current[passoId].url)
-      return { ...current, [passoId]: { blob: file, url: URL.createObjectURL(file) } }
-    })
+    marcarEnvio(passoId, true)
+    try {
+      const blob = await comprimirImagem(file)
+      await api('prints', {
+        method: 'PUT',
+        body: { execucaoId, passoId, tipo: blob.type, imagemBase64: await blobParaBase64(blob) },
+      })
+      setPrints((current) => {
+        if (current[passoId]) URL.revokeObjectURL(current[passoId].url)
+        return { ...current, [passoId]: { blob, url: URL.createObjectURL(blob) } }
+      })
+    } catch (err) {
+      setStatus(`Print não salvo: ${err.message}`)
+    } finally {
+      marcarEnvio(passoId, false)
+    }
   }
 
   function toggleHint(passoId) {
     setHintsAbertos((current) => ({ ...current, [passoId]: !current[passoId] }))
   }
 
-  function removePrint(passoId) {
-    setPrints((current) => {
-      const { [passoId]: removed, ...rest } = current
-      if (removed) URL.revokeObjectURL(removed.url)
-      return rest
-    })
+  async function removePrint(passoId) {
+    setStatus('')
+    marcarEnvio(passoId, true)
+    try {
+      await api(`prints?execucaoId=${encodeURIComponent(execucaoId)}&passoId=${encodeURIComponent(passoId)}`, {
+        method: 'DELETE',
+      })
+      setPrints((current) => {
+        const { [passoId]: removed, ...rest } = current
+        if (removed) URL.revokeObjectURL(removed.url)
+        return rest
+      })
+    } catch (err) {
+      setStatus(`Não foi possível remover o print: ${err.message}`)
+    } finally {
+      marcarEnvio(passoId, false)
+    }
   }
 
-  function handleVoltar() {
-    if (concluidos > 0 && !window.confirm('Sair sem finalizar? Os prints anexados serão perdidos.')) return
-    voltar()
+  // Abre o documento como ficará, sem concluir a validação.
+  async function handleVisualizar() {
+    // A aba abre já no clique; senão o navegador bloqueia como pop-up.
+    const aba = window.open('', '_blank')
+    setStatus('')
+    try {
+      const pdf = await gerarPdfValidacao({ jornada, prints, usuario: user, data: new Date(), gml: bateria.gml })
+      const url = URL.createObjectURL(pdf)
+      if (aba) aba.location.href = url
+      else window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      aba?.close()
+      console.error(err)
+      setStatus('Não foi possível gerar a visualização do documento.')
+    }
   }
 
   async function handleSave() {
@@ -188,7 +251,7 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
   return (
     <>
       <header className="hero">
-        <button type="button" className="btn-limpar" onClick={handleVoltar}>← Voltar</button>
+        <button type="button" className="btn-limpar" onClick={voltar}>← Voltar</button>
         <h1>{jornada.nome}</h1>
         <p>GML {bateria.gml} · em validação por você</p>
       </header>
@@ -232,6 +295,7 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
                   <PrintField
                     numero={i + 1}
                     print={prints[p.id]}
+                    enviando={Boolean(enviando[p.id])}
                     onFile={(file) => setPrint(p.id, file)}
                     onRemove={() => removePrint(p.id)}
                   />
@@ -240,11 +304,18 @@ export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNa
             </ol>
 
             <div className="form-actions">
-              <button type="button" className="primary-btn" onClick={handleSave} disabled={!completo || saving}>
+              <button type="button" className="btn-limpar" onClick={handleVisualizar} disabled={concluidos === 0}>
+                Visualizar documento
+              </button>
+              <button type="button" className="primary-btn" onClick={handleSave}
+                disabled={!completo || saving || Object.values(enviando).some(Boolean)}>
                 {saving ? 'Salvando...' : 'Finalizar validação'}
               </button>
             </div>
-            {!completo && <p className="muted">Anexe o print de todos os passos para finalizar.</p>}
+            <p className="muted">
+              Os prints ficam salvos: você pode sair e continuar depois.
+              {!completo && ' Anexe o print de todos os passos para finalizar.'}
+            </p>
             {status && <p className="status" role="status">{status}</p>}
           </section>
         </div>

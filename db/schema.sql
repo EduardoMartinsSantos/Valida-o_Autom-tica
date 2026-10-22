@@ -30,6 +30,11 @@ create table if not exists validacao.baterias (
   criado_em timestamptz not null default now()
 );
 
+-- Link da pasta no SharePoint, informado depois do upload. Ao salvar, PDFs e prints são apagados.
+alter table validacao.baterias add column if not exists link_pasta text;
+alter table validacao.baterias add column if not exists finalizada_em timestamptz;
+alter table validacao.baterias add column if not exists finalizada_por text;
+
 -- Uma validação de jornada dentro de uma bateria. Sem linha = pendente.
 create table if not exists validacao.execucoes (
   id uuid primary key default gen_random_uuid(),
@@ -44,4 +49,15 @@ create table if not exists validacao.execucoes (
   progresso jsonb,
   pdf bytea,
   unique (bateria_id, jornada_id)
+);
+
+-- Prints da validação. Ficam até o link da pasta ser salvo na bateria
+-- (ou somem ao liberar a validação, por cascade).
+create table if not exists validacao.execucao_prints (
+  execucao_id uuid not null references validacao.execucoes(id) on delete cascade,
+  passo_id text not null,
+  imagem bytea not null,
+  tipo text not null,
+  atualizado_em timestamptz not null default now(),
+  primary key (execucao_id, passo_id)
 );
