@@ -21,3 +21,27 @@ create table if not exists validacao.login_falhas (
   tentativas integer not null,
   desde timestamptz not null
 );
+
+-- Bateria de validação: um grupo de validações identificado pelo número da GML.
+create table if not exists validacao.baterias (
+  id uuid primary key default gen_random_uuid(),
+  gml text not null,
+  criado_por text not null,
+  criado_em timestamptz not null default now()
+);
+
+-- Uma validação de jornada dentro de uma bateria. Sem linha = pendente.
+create table if not exists validacao.execucoes (
+  id uuid primary key default gen_random_uuid(),
+  bateria_id uuid not null references validacao.baterias(id) on delete cascade,
+  jornada_id uuid not null references validacao.jornadas(id) on delete restrict,
+  jornada_nome text not null,
+  status text not null check (status in ('em_validacao', 'concluida')),
+  responsavel_email text not null,
+  responsavel_nome text,
+  iniciado_em timestamptz not null default now(),
+  concluido_em timestamptz,
+  progresso jsonb,
+  pdf bytea,
+  unique (bateria_id, jornada_id)
+);

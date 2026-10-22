@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
+import { api, useCarregar } from '../api.js'
 import { useJornadas } from '../jornadas.js'
 import { gerarPdfValidacao } from '../pdf.js'
-import { escolherDestino, gravar } from '../salvarArquivo.js'
 import RichTextEditor from '../components/RichTextEditor.jsx'
 
 const MAX_PRINT_BYTES = 10 * 1024 * 1024
+// Limite do servidor (server/baterias.js).
+const MAX_PDF_BYTES = 3 * 1024 * 1024
+
+function blobParaBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1])
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
 
 function imageFrom(dataTransfer) {
   return [...(dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/')) ?? null
@@ -76,15 +87,12 @@ function PrintField({ numero, print, onFile, onRemove }) {
   )
 }
 
-// Nome de arquivo válido no Windows/SharePoint.
-function nomeArquivo(jornadaNome, data) {
-  // sv-SE formata como "2026-10-22 14:05".
-  const carimbo = data.toLocaleString('sv-SE').slice(0, 16).replace(':', 'h')
-  return `Validacao - ${jornadaNome} - ${carimbo}.pdf`.replace(/[\\/:*?"<>|]/g, '-')
-}
-
-export default function Validacao({ jornadaId, user, onNavigate }) {
+export default function Validacao({ bateriaId, jornadaId, execucaoId, user, onNavigate }) {
   const { jornadas, loading, error } = useJornadas()
+  const { data: bateria, loading: carregandoBateria } = useCarregar(
+    () => api(`baterias/${bateriaId}`).then((d) => d.bateria),
+    [bateriaId],
+  )
   const jornada = jornadas.find((j) => j.id === jornadaId)
   // passoId -> { blob, url }
   const [prints, setPrints] = useState({})
@@ -96,14 +104,16 @@ export default function Validacao({ jornadaId, user, onNavigate }) {
   printsRef.current = prints
   useEffect(() => () => Object.values(printsRef.current).forEach((p) => URL.revokeObjectURL(p.url)), [])
 
-  if (loading) return <p className="muted">Carregando jornada...</p>
+  if (loading || carregandoBateria) return <p className="muted">Carregando jornada...</p>
 
-  if (!jornada) {
+  const voltar = () => onNavigate('bateria', { bateriaId })
+
+  if (!jornada || !bateria) {
     return (
       <section className="card">
-        <p className="muted list-empty">{error || 'Jornada não encontrada.'}</p>
+        <p className="muted list-empty">{error || 'Jornada ou bateria não encontrada.'}</p>
         <div className="form-actions">
-          <button type="button" className="btn-limpar" onClick={() => onNavigate('inicio')}>Voltar</button>
+          <button type="button" className="btn-limpar" onClick={voltar}>Voltar</button>
         </div>
       </section>
     )
@@ -143,8 +153,8 @@ export default function Validacao({ jornadaId, user, onNavigate }) {
   }
 
   function handleVoltar() {
-    if (concluidos > 0 && !window.confirm('Sair sem salvar? Os prints anexados serão perdidos.')) return
-    onNavigate('inicio')
+    if (concluidos > 0 && !window.confirm('Sair sem finalizar? Os prints anexados serão perdidos.')) return
+    voltar()
   }
 
   async function handleSave() {
@@ -152,17 +162,24 @@ export default function Validacao({ jornadaId, user, onNavigate }) {
     setStatus('')
     setSaving(true)
     try {
-      // A janela "Salvar como" abre primeiro: o navegador só a permite logo após o clique.
-      const destino = await escolherDestino(nomeArquivo(jornada.nome, data))
-      if (!destino) return
-      const pdf = await gerarPdfValidacao({ jornada, prints, usuario: user, data })
-      await gravar(destino, pdf)
-      Object.values(prints).forEach((p) => URL.revokeObjectURL(p.url))
-      setPrints({})
-      setStatus('PDF da validação salvo.')
+      const pdf = await gerarPdfValidacao({ jornada, prints, usuario: user, data, gml: bateria.gml })
+      if (pdf.size > MAX_PDF_BYTES) {
+        setStatus('O PDF passou de 3 MB. Use prints menores ou recortados.')
+        return
+      }
+      await api(`execucoes/${execucaoId}`, {
+        method: 'PUT',
+        body: {
+          pdfBase64: await blobParaBase64(pdf),
+          progresso: {
+            passos: jornada.passos.map((p) => ({ id: p.id, titulo: p.titulo, concluido: Boolean(prints[p.id]) })),
+          },
+        },
+      })
+      voltar()
     } catch (err) {
       console.error(err)
-      setStatus('Não foi possível gerar ou salvar o PDF.')
+      setStatus(err.message || 'Não foi possível gerar ou salvar o PDF.')
     } finally {
       setSaving(false)
     }
@@ -173,6 +190,7 @@ export default function Validacao({ jornadaId, user, onNavigate }) {
       <header className="hero">
         <button type="button" className="btn-limpar" onClick={handleVoltar}>← Voltar</button>
         <h1>{jornada.nome}</h1>
+        <p>GML {bateria.gml} · em validação por você</p>
       </header>
 
       <div className="validacao-layout">
@@ -223,10 +241,10 @@ export default function Validacao({ jornadaId, user, onNavigate }) {
 
             <div className="form-actions">
               <button type="button" className="primary-btn" onClick={handleSave} disabled={!completo || saving}>
-                {saving ? 'Gerando PDF...' : 'Salvar validação (PDF)'}
+                {saving ? 'Salvando...' : 'Finalizar validação'}
               </button>
             </div>
-            {!completo && <p className="muted">Anexe o print de todos os passos para salvar.</p>}
+            {!completo && <p className="muted">Anexe o print de todos os passos para finalizar.</p>}
             {status && <p className="status" role="status">{status}</p>}
           </section>
         </div>

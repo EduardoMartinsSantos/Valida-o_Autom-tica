@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, SESSAO_EXPIRADA } from './api.js'
 import Sidebar from './components/Sidebar.jsx'
+import Bateria from './pages/Bateria.jsx'
 import Configuracoes from './pages/Configuracoes.jsx'
 import Inicio from './pages/Inicio.jsx'
 import Login from './pages/Login.jsx'
@@ -9,11 +10,12 @@ import Validacao from './pages/Validacao.jsx'
 const PAGES = {
   inicio: Inicio,
   configuracoes: Configuracoes,
+  bateria: Bateria,
   validacao: Validacao,
 }
 
 // Páginas sem item próprio no menu destacam o item de origem.
-const MENU_ITEM = { validacao: 'inicio' }
+const MENU_ITEM = { bateria: 'inicio', validacao: 'inicio' }
 
 export default function App() {
   // undefined = verificando sessão; null = deslogado.

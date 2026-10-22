@@ -459,3 +459,43 @@ input:focus, textarea:focus { outline: 2px solid #5e94d6; border-color: #5e94d6;
 .login-card h1 { margin: 0; font-size: 1.5rem; color: #1f3f5d; }
 .login-card .muted { margin: 0; }
 .login-card .field-error { margin: 0; }
+
+.field-label { font-weight: 600; }
+
+.bateria-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-top: 0.75rem; }
+
+.progress-sm { display: block; height: 6px; margin: 0.25rem 0 0; }
+.progress-sm .progress-bar { display: block; }
+
+.execucao-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+
+.execucao-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid #d8e0eb;
+  border-radius: 10px;
+}
+
+.execucao-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+
+.status-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.status-pendente { background: #eef2f6; color: #44505c; }
+.status-andamento { background: #fff3c4; color: #7a5b00; }
+.status-concluida { background: #dcf3e5; color: #166c38; }
+
+.btn-limpar:disabled { opacity: 0.65; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .bateria-form { grid-template-columns: 1fr; }
+  .execucao-item { flex-wrap: wrap; }
+  .execucao-item .row-actions { width: 100%; }
+}

@@ -10,6 +10,12 @@ if (!DATABASE_URL || !VALIDACAO_DATABASE_URL) {
   console.error('Defina DATABASE_URL (Escala) e VALIDACAO_DATABASE_URL (banco novo).')
   process.exit(1)
 }
+for (const [nome, url] of Object.entries({ DATABASE_URL, VALIDACAO_DATABASE_URL })) {
+  if (!/^postgres(ql)?:\/\//.test(url)) {
+    console.error(`${nome} não parece uma connection string (deve começar com postgresql://).`)
+    process.exit(1)
+  }
+}
 if (DATABASE_URL === VALIDACAO_DATABASE_URL) {
   console.error('DATABASE_URL e VALIDACAO_DATABASE_URL apontam para o mesmo banco.')
   process.exit(1)

@@ -32,6 +32,7 @@ export function parseJornada(body) {
 function traduzErro(err) {
   if (err.code === '23505') return new HttpError(409, 'Já existe uma jornada com esse nome.')
   if (err.code === '22P02') return new HttpError(404, 'Jornada não encontrada.')
+  if (err.code === '23503') return new HttpError(409, 'Esta jornada já foi usada em baterias de validação e não pode ser excluída.')
   return err
 }
 
