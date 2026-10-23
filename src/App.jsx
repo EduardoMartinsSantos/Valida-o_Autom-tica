@@ -47,9 +47,18 @@ export default function App() {
     <div className="app-shell">
       <Sidebar active={MENU_ITEM[page] ?? page} onNavigate={navigate}
         user={user} onLogout={handleLogout} />
-      <main className="layout">
-        <Page key={JSON.stringify(route)} {...route.params} user={user} onNavigate={navigate} />
-      </main>
+      <div className="app-content">
+        <header className="topbar" aria-label="Usuário logado">
+          <div className="topbar-user">
+            <span className="topbar-nome">{user.name ?? user.email}</span>
+            <span className="topbar-email">{user.email}</span>
+          </div>
+          {user.admin && <span className="status-badge status-admin">Admin</span>}
+        </header>
+        <main className="layout">
+          <Page key={JSON.stringify(route)} {...route.params} user={user} onNavigate={navigate} />
+        </main>
+      </div>
     </div>
   )
 }

@@ -91,7 +91,8 @@ export default function Inicio({ onNavigate }) {
                   </span>
                   <span className="muted">{dataHora(b.criado_em)} · {b.criado_por}</span>
                   <span className="jornada-card-resumo">
-                    {b.concluidas} de {b.total} concluídas
+                    {b.concluidas} de {b.total} resolvidas
+                    {b.sem_alteracao > 0 && ` (${b.sem_alteracao} sem alteração)`}
                     {b.em_validacao > 0 && ` · ${b.em_validacao} em validação`}
                   </span>
                   <span className="progress progress-sm" aria-hidden="true">

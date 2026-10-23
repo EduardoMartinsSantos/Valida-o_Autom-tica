@@ -63,12 +63,16 @@ export function requireUser(req) {
 
 // Admin vem da Nova Escala (colaboradores.admin). Conferido no banco a cada alteração,
 // para que perder o admin valha na hora, sem esperar a sessão expirar.
-export async function requireAdmin(req) {
-  const user = requireUser(req)
+export async function ehAdmin(user) {
   const { rows } = await queryEscala(
     'select admin from public.colaboradores where id = $1 and ativo <> 0',
     [user.id],
   )
-  if (!rows[0]?.admin) throw new HttpError(403, 'Apenas administradores podem alterar jornadas.')
+  return Boolean(rows[0]?.admin)
+}
+
+export async function requireAdmin(req, mensagem = 'Apenas administradores podem alterar jornadas.') {
+  const user = requireUser(req)
+  if (!(await ehAdmin(user))) throw new HttpError(403, mensagem)
   return user
 }

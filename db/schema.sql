@@ -41,7 +41,7 @@ create table if not exists validacao.execucoes (
   bateria_id uuid not null references validacao.baterias(id) on delete cascade,
   jornada_id uuid references validacao.jornadas(id) on delete set null,
   jornada_nome text not null,
-  status text not null check (status in ('em_validacao', 'concluida')),
+  status text not null,
   responsavel_email text not null,
   responsavel_nome text,
   iniciado_em timestamptz not null default now(),
@@ -57,6 +57,11 @@ alter table validacao.execucoes alter column jornada_id drop not null;
 alter table validacao.execucoes drop constraint if exists execucoes_jornada_id_fkey;
 alter table validacao.execucoes add constraint execucoes_jornada_id_fkey
   foreign key (jornada_id) references validacao.jornadas(id) on delete set null;
+
+-- sem_alteracao: jornada não afetada pela GML; conta como resolvida e não gera PDF.
+alter table validacao.execucoes drop constraint if exists execucoes_status_check;
+alter table validacao.execucoes add constraint execucoes_status_check
+  check (status in ('em_validacao', 'concluida', 'sem_alteracao'));
 
 -- Prints da validação. Ficam até o link da pasta ser salvo na bateria
 -- (ou somem ao liberar a validação, por cascade).

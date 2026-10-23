@@ -1,5 +1,6 @@
 import { query } from './db.js'
 import { HttpError } from './http.js'
+import { ehAdmin } from './session.js'
 
 // O PDF vem em base64 dentro do JSON; a Vercel limita o corpo a ~4,5 MB.
 const MAX_PDF_BYTES = 3 * 1024 * 1024
@@ -16,7 +17,9 @@ export async function listarBaterias() {
       (case when b.link_pasta is not null then count(e.id)
             else (select count(*) from validacao.jornadas) end)::int as total,
       (count(e.id) filter (where e.status = 'em_validacao'))::int as em_validacao,
-      (count(e.id) filter (where e.status = 'concluida'))::int as concluidas
+      -- "concluidas" = resolvidas (validadas ou sem alteração); sem_alteracao separa as não validadas.
+      (count(e.id) filter (where e.status in ('concluida', 'sem_alteracao')))::int as concluidas,
+      (count(e.id) filter (where e.status = 'sem_alteracao'))::int as sem_alteracao
     from validacao.baterias b
     left join validacao.execucoes e on e.bateria_id = b.id
     group by b.id
@@ -163,7 +166,8 @@ export async function salvarLinkPasta(id, body, user) {
          set link_pasta = $2, finalizada_em = now(), finalizada_por = $3
          where b.id = $1 and b.link_pasta is null
            and (select count(*) from validacao.jornadas) > 0
-           and (select count(*) from validacao.execucoes e where e.bateria_id = b.id and e.status = 'concluida')
+           and (select count(*) from validacao.execucoes e
+                where e.bateria_id = b.id and e.status in ('concluida', 'sem_alteracao'))
              = (select count(*) from validacao.jornadas)
          returning b.id
        ),
@@ -204,6 +208,55 @@ export async function reabrirExecucao(id, user) {
       throw new HttpError(409, 'Só é possível reabrir validações concluídas de baterias sem link salvo.')
     }
     return rows[0]
+  } catch (err) {
+    throw traduzErro(err)
+  }
+}
+
+// Marca a jornada como "sem alteração" na bateria: resolvida sem validar (sem prints nem PDF).
+export async function marcarSemAlteracao(body, user) {
+  const { bateriaId, jornadaId } = body ?? {}
+  try {
+    const { rows } = await query(
+      `insert into validacao.execucoes
+         (bateria_id, jornada_id, jornada_nome, status, responsavel_email, responsavel_nome, concluido_em)
+       select b.id, j.id, j.nome, 'sem_alteracao', $3, $4, now()
+       from validacao.baterias b, validacao.jornadas j
+       where b.id = $1 and j.id = $2 and b.link_pasta is null
+       on conflict (bateria_id, jornada_id) do nothing
+       returning id`,
+      [bateriaId, jornadaId, user.email, user.name],
+    )
+    if (!rows[0]) {
+      throw new HttpError(409, 'Esta jornada já foi iniciada ou marcada nesta bateria (ou a bateria já foi finalizada).')
+    }
+    return rows[0]
+  } catch (err) {
+    throw traduzErro(err)
+  }
+}
+
+// Desfaz o "sem alteração" (volta a pendente). Quem marcou ou um admin; só com a bateria aberta.
+export async function desfazerSemAlteracao(id, user) {
+  const admin = await ehAdmin(user)
+  try {
+    const { rowCount } = await query(
+      `delete from validacao.execucoes e using validacao.baterias b
+       where e.id = $1 and e.bateria_id = b.id and e.status = 'sem_alteracao' and b.link_pasta is null
+         and (e.responsavel_email = $2 or $3)`,
+      [id, user.email, admin],
+    )
+    if (!rowCount) throw new HttpError(409, 'Só quem marcou (ou um admin) pode desfazer, e só com a bateria aberta.')
+  } catch (err) {
+    throw traduzErro(err)
+  }
+}
+
+// Exclui a bateria inteira (validações, prints e PDFs vão junto por cascade). Só admin (checado na rota).
+export async function excluirBateria(id) {
+  try {
+    const { rowCount } = await query('delete from validacao.baterias where id = $1', [id])
+    if (!rowCount) throw new HttpError(404, 'Bateria não encontrada.')
   } catch (err) {
     throw traduzErro(err)
   }

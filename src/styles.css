@@ -549,3 +549,28 @@ input:focus, textarea:focus { outline: 2px solid #5e94d6; border-color: #5e94d6;
 @media (max-width: 640px) {
   .execucao-item .row-actions { padding: 0 0.75rem 0.75rem; }
 }
+
+.app-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #d8e0eb;
+}
+
+.topbar-user { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; min-width: 0; }
+.topbar-nome { font-weight: 700; color: #1f3f5d; }
+.topbar-email { font-size: 0.82rem; color: #66717d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw; }
+.status-admin { background: #1f3f5d; color: #fff; }
+
+.app-content .layout { width: 100%; }
+
+.hero-acoes { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+.hero .hero-acoes .btn-limpar { margin-bottom: 0; }
+.btn-danger:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.status-sem { background: #ece8f7; color: #4b3f7a; }

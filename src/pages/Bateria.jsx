@@ -11,7 +11,11 @@ const STATUS = {
   pendente: { label: 'Pendente', className: 'status-pendente' },
   em_validacao: { label: 'Em validação', className: 'status-andamento' },
   concluida: { label: 'Concluída', className: 'status-concluida' },
+  sem_alteracao: { label: 'Sem alteração', className: 'status-sem' },
 }
+
+// Validada ou marcada como sem alteração: a jornada está resolvida na bateria.
+const resolvida = (execucao) => execucao?.status === 'concluida' || execucao?.status === 'sem_alteracao'
 
 export default function Bateria({ bateriaId, user, onNavigate }) {
   const { data: bateria, loading, error, recarregar } = useCarregar(
@@ -48,7 +52,7 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
       jornada,
       execucao: bateria.execucoes.find((e) => e.jornada_id === jornada.id) ?? null,
     }))
-  const concluidas = linhas.filter((l) => l.execucao?.status === 'concluida').length
+  const concluidas = linhas.filter((l) => resolvida(l.execucao)).length
   const percentual = linhas.length ? Math.round((concluidas / linhas.length) * 100) : 0
   const stBateria = statusBateria({ link_pasta: bateria.link_pasta, total: linhas.length, concluidas })
   const fechada = Boolean(bateria.link_pasta)
@@ -76,6 +80,25 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
     })
     abrirValidacao(jornada.id, execucao.id)
   })
+
+  const marcarSemAlteracao = (jornada) => acao(jornada.id, async () => {
+    await api('execucoes', { method: 'POST', body: { bateriaId, jornadaId: jornada.id, semAlteracao: true } })
+    recarregar()
+  })
+
+  const desfazerSemAlteracao = (jornada, execucao) => acao(jornada.id, async () => {
+    await api(`execucoes/${execucao.id}?semAlteracao=1`, { method: 'DELETE' })
+    recarregar()
+  })
+
+  function excluirBateria() {
+    if (!window.confirm(`Excluir a bateria GML ${bateria.gml}?\n\n`
+      + 'Todas as validações, prints e PDFs dela serão apagados. Não dá para desfazer.')) return
+    acao('excluir', async () => {
+      await api(`baterias/${bateria.id}`, { method: 'DELETE' })
+      onNavigate('inicio')
+    })
+  }
 
   const liberar = (jornada, execucao) => {
     if (!window.confirm(`Liberar a validação de "${jornada.nome}"? Ela volta para Pendente.`)) return
@@ -121,7 +144,14 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
   return (
     <>
       <header className="hero">
-        <button type="button" className="btn-limpar" onClick={() => onNavigate('inicio')}>← Voltar</button>
+        <div className="hero-acoes">
+          <button type="button" className="btn-limpar" onClick={() => onNavigate('inicio')}>← Voltar</button>
+          {user.admin && (
+            <button type="button" className="btn-danger" onClick={excluirBateria} disabled={ocupado === 'excluir'}>
+              {ocupado === 'excluir' ? 'Excluindo...' : 'Excluir bateria'}
+            </button>
+          )}
+        </div>
         <div className="titulo-status">
           <h1>GML {bateria.gml}</h1>
           <span className={`status-badge ${stBateria.className}`}>{stBateria.label}</span>
@@ -173,7 +203,7 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
       <section className="card">
         <div className="form-header-row">
           <h2>Validações</h2>
-          <strong>{concluidas} de {linhas.length} concluídas ({percentual}%)</strong>
+          <strong>{concluidas} de {linhas.length} resolvidas ({percentual}%)</strong>
         </div>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={linhas.length}
           aria-valuenow={concluidas} aria-label="Validações concluídas">
@@ -208,21 +238,37 @@ export default function Bateria({ bateriaId, user, onNavigate }) {
                         {execucao?.status === 'em_validacao' && `${minha ? 'Você' : quem} · desde ${dataHora(execucao.iniciado_em)}`}
                         {execucao?.status === 'concluida' &&
                           `${quem} · ${dataHora(execucao.concluido_em)} · ${execucao.progresso.concluidos}/${execucao.progresso.total} passos`}
+                        {execucao?.status === 'sem_alteracao' &&
+                          `${quem} · ${dataHora(execucao.concluido_em)} · não validada`}
                       </span>
                     </span>
                     <span className={`status-badge ${st.className}`}>{st.label}</span>
                   </button>
-                  {((execucao?.status === 'em_validacao' && minha) || (execucao?.status === 'concluida' && !fechada)) && (
+                  {!fechada && (
                     <div className="row-actions">
-                      {execucao.status === 'em_validacao' ? (
+                      {!execucao && (
+                        <button type="button" className="btn-limpar" disabled={desabilitado}
+                          onClick={() => marcarSemAlteracao(jornada)}
+                          title="Jornada não afetada pela GML: conta como resolvida, sem validar">
+                          Sem alteração
+                        </button>
+                      )}
+                      {execucao?.status === 'em_validacao' && minha && (
                         <button type="button" className="btn-limpar" disabled={desabilitado}
                           onClick={() => liberar(jornada, execucao)}>
                           Liberar
                         </button>
-                      ) : (
+                      )}
+                      {execucao?.status === 'concluida' && (
                         <button type="button" className="btn-limpar" disabled={desabilitado}
                           onClick={() => baixarPdf(jornada, execucao)}>
                           Baixar PDF
+                        </button>
+                      )}
+                      {execucao?.status === 'sem_alteracao' && (minha || user.admin) && (
+                        <button type="button" className="btn-limpar" disabled={desabilitado}
+                          onClick={() => desfazerSemAlteracao(jornada, execucao)}>
+                          Desfazer
                         </button>
                       )}
                     </div>

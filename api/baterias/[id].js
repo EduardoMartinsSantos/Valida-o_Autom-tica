@@ -1,6 +1,6 @@
 import { route } from '../../server/http.js'
-import { requireUser } from '../../server/session.js'
-import { obterBateria, salvarLinkPasta } from '../../server/baterias.js'
+import { requireAdmin, requireUser } from '../../server/session.js'
+import { excluirBateria, obterBateria, salvarLinkPasta } from '../../server/baterias.js'
 
 export default route({
   async GET(req, res) {
@@ -11,6 +11,12 @@ export default route({
   async PUT(req, res) {
     const user = requireUser(req)
     await salvarLinkPasta(req.query.id, req.body, user)
+    res.json({ ok: true })
+  },
+  // Exclui a bateria (ex.: baterias de teste). Só admin.
+  async DELETE(req, res) {
+    await requireAdmin(req, 'Apenas administradores podem excluir baterias.')
+    await excluirBateria(req.query.id)
     res.json({ ok: true })
   },
 })

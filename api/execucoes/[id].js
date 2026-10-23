@@ -1,6 +1,8 @@
 import { route } from '../../server/http.js'
 import { requireUser } from '../../server/session.js'
-import { finalizarExecucao, liberarExecucao, obterPdf, reabrirExecucao } from '../../server/baterias.js'
+import {
+  desfazerSemAlteracao, finalizarExecucao, liberarExecucao, obterPdf, reabrirExecucao,
+} from '../../server/baterias.js'
 
 export default route({
   // Download do PDF da validação concluída.
@@ -21,9 +23,11 @@ export default route({
     const user = requireUser(req)
     res.json({ execucao: await reabrirExecucao(req.query.id, user) })
   },
+  // Libera a validação em andamento; com ?semAlteracao=1 desfaz o "sem alteração".
   async DELETE(req, res) {
     const user = requireUser(req)
-    await liberarExecucao(req.query.id, user)
+    if (req.query.semAlteracao) await desfazerSemAlteracao(req.query.id, user)
+    else await liberarExecucao(req.query.id, user)
     res.json({ ok: true })
   },
 })
